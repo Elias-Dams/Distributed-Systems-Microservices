@@ -1,9 +1,9 @@
 version: "3.9"
 volumes:
   songs_data:  # Create a volume core_data that will contain the data for 'songs_persistence', such that when the container is stopped / crashes, the data remains.
-  user_data:
-  playlist_data:
-  activity_data:
+  users_data:
+  playlists_data:
+  activities_data:
 services:
   songs_persistence:
     image: docker.io/postgres
@@ -20,35 +20,35 @@ services:
     command: >
       bash -c "chmod +x /docker-entrypoint-initdb.d/init.sh && docker-entrypoint.sh postgres"
 
-  user_persistence:
+  users_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./user_persistence/:/docker-entrypoint-initdb.d
-      - user_data:/var/lib/postgresql/data
+      - ./users_persistence/:/docker-entrypoint-initdb.d
+      - users_data:/var/lib/postgresql/data
 
-  playlist_persistence:
+  playlists_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./playlist_persistence/:/docker-entrypoint-initdb.d
-      - playlist_data:/var/lib/postgresql/data
+      - ./playlists_persistence/:/docker-entrypoint-initdb.d
+      - playlists_data:/var/lib/postgresql/data
 
-  activity_persistence:
+  activities_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./activity_persistence/:/docker-entrypoint-initdb.d
-      - activity_data:/var/lib/postgresql/data
+      - ./activities_persistence/:/docker-entrypoint-initdb.d
+      - activities_data:/var/lib/postgresql/data
 
   songs:
     build: ./songs
@@ -57,29 +57,29 @@ services:
     depends_on:
       - songs_persistence
 
-  user:
-    build: ./user
+  users:
+    build: ./users
     ports:
       - 5002:5000
     depends_on:
-      - user_persistence
+      - users_persistence
 
-  playlist:
-    build: ./playlist
+  playlists:
+    build: ./playlists
     ports:
       - 5003:5000
     depends_on:
-      - playlist_persistence
-      - user
+      - playlists_persistence
+      - users
 
-  activity:
-    build: ./activity
+  activities:
+    build: ./activities
     ports:
       - 5004:5000
     depends_on:
-      - activity_persistence
-      - user
-      - playlist
+      - activities_persistence
+      - users
+      - playlists
 
   gui:
     build: ./gui

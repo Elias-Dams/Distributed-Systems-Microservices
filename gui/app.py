@@ -34,14 +34,14 @@ def feed():
     if username is not None:
         feed = []  # TODO: call
     else:
-        feed = []
+        feed = [["test", "test", "test"]]
 
     return render_template('feed.html', username=username, password=password, feed=feed)
 
 
 @app.route("/catalogue")
 def catalogue():
-    songs = requests.get("http://songs:5000/songs").json()
+    songs = []
 
     return render_template('catalogue.html', username=username, password=password, songs=songs)
 
