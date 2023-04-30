@@ -12,7 +12,7 @@ conn = None
 while conn is None:
     try:
         conn = psycopg2.connect(dbname="activities", user="postgres", password="postgres", host="activities_persistence")
-        print("DB connection succesful activities")
+        print("DB connection succesful")
     except psycopg2.OperationalError:
         import time
         time.sleep(1)
