@@ -20,34 +20,34 @@ services:
     command: >
       bash -c "chmod +x /docker-entrypoint-initdb.d/init.sh && docker-entrypoint.sh postgres"
 
-  user_management_persistence:
+  user_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./user_management_persistence/:/docker-entrypoint-initdb.d
+      - ./user_persistence/:/docker-entrypoint-initdb.d
       - user_data:/var/lib/postgresql/data
 
-  playlist_management_persistence:
+  playlist_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./playlist_management_persistence/:/docker-entrypoint-initdb.d
+      - ./playlist_persistence/:/docker-entrypoint-initdb.d
       - playlist_data:/var/lib/postgresql/data
 
-  activity_feeds_persistence:
+  activity_persistence:
     image: docker.io/postgres
     restart: always
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:
-      - ./activity_feeds_persistence/:/docker-entrypoint-initdb.d
+      - ./activity_persistence/:/docker-entrypoint-initdb.d
       - activity_data:/var/lib/postgresql/data
 
   songs:
@@ -62,14 +62,14 @@ services:
     ports:
       - 5002:5000
     depends_on:
-      - user_management_persistence
+      - user_persistence
 
   playlist:
     build: ./playlist
     ports:
       - 5003:5000
     depends_on:
-      - playlist_management_persistence
+      - playlist_persistence
       - user
 
   activity:
@@ -77,7 +77,7 @@ services:
     ports:
       - 5004:5000
     depends_on:
-      - activity_feeds_persistence
+      - activity_persistence
       - user
       - playlist
 
