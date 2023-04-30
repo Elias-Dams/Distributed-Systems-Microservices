@@ -34,7 +34,7 @@ def feed():
     if username is not None:
         feed = []  # TODO: call
     else:
-        feed = [["test", "test", "test"]]
+        feed = []
 
     return render_template('feed.html', username=username, password=password, feed=feed)
 
