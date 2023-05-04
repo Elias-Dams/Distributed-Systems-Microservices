@@ -41,7 +41,7 @@ def feed():
 
 @app.route("/catalogue")
 def catalogue():
-    songs = []
+    songs = requests.get("http://songs:5000/songs").json()
 
     return render_template('catalogue.html', username=username, password=password, songs=songs)
 
@@ -64,7 +64,10 @@ def actual_login():
     # microservice returns True if correct combination, False if otherwise.
     # Also pay attention to the status code returned by the microservice.
     # ================================
-    success = None  # TODO: call
+
+    response = requests.post("http://users:5000/user", params={'username': req_username, 'password': req_password})
+    user_exists = response.json()['success']
+    success = response.status_code == 200 and user_exists
 
     save_to_session('success', success)
     if success:
@@ -96,7 +99,9 @@ def actual_register():
     # Registration is successful if a user with the same username doesn't exist yet.
     # ================================
 
-    success = None  # TODO: call
+    response = requests.put("http://users:5000/user/add", params={'username': req_username, 'password': req_password})
+    user_exists = response.json()['success']
+    success = response.status_code == 200 and user_exists
     save_to_session('success', success)
 
     if success:
