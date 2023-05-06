@@ -86,6 +86,14 @@ def get_friends(username):
 
     return True, friends
 
+def get_userdata(username):
+    cur = conn.cursor()
+    cur.execute("SELECT id, username, password FROM users WHERE username = %s;", (username,))
+    result = cur.fetchone()
+    if result:
+        return True, {'id': result[0], 'username': result[1], 'password': result[2]}
+    return False, None
+
 class UserExists(Resource):
     def post(self):
         request_data = flask_request.json
@@ -95,6 +103,14 @@ class UserExists(Resource):
             return {'message': 'Invalid request. Please provide both username and password.', 'success': False}, 400
         exists = user_exists(username, password)
         return {'success': exists}, 200
+
+class GetUserdata(Resource):
+    def get(self):
+        args = flask_request.args
+        if 'username' not in args:
+            return {'message': 'Invalid request. Please provide the username.', 'success': False}, 400
+        status, user_date = get_userdata(args['username'])
+        return {'success': status, 'result': user_date}, 200
 
 class AddUser(Resource):
     def put(self):
@@ -119,6 +135,7 @@ class AddFriends(Resource):
         return {'success': add_friend(args['user_1'], args['user_2'])}, 200
 
 api.add_resource(UserExists, '/user/')
+api.add_resource(GetUserdata, '/user/data')
 api.add_resource(AddUser, '/user/add')
 api.add_resource(FriendsOfUser, '/user/friends')
 api.add_resource(AddFriends, '/user/add_friend')

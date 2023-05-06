@@ -170,9 +170,15 @@ def playlists():
         #
         # Get all playlists you created and all playlist that are shared with you. (list of id, title pairs)
         # ================================
+        response = requests.get("http://playlists:5000/playlists", params={'username': username})
+        status = response.json()['success']
+        if response.status_code == 200 and status:
+            my_playlists = response.json()['result']
 
-        my_playlists = []  # TODO: call
-        shared_with_me = []  # TODO: call
+        response = requests.get("http://playlists:5000/playlists", params={'username': username, 'shared': True})
+        status = response.json()['success']
+        if response.status_code == 200 and status:
+            shared_with_me = response.json()['result']
 
     return render_template('playlists.html', username=username, password=password, my_playlists=my_playlists, shared_with_me=shared_with_me)
 
@@ -187,7 +193,7 @@ def create_playlist():
     global username
     title = request.form['title']
 
-    # TODO: call
+    requests.post("http://playlists:5000/playlists/create", json={'username': username, 'title': title})
 
     return redirect('/playlists')
 
