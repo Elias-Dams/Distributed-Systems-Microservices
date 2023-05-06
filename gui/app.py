@@ -65,7 +65,7 @@ def actual_login():
     # Also pay attention to the status code returned by the microservice.
     # ================================
 
-    response = requests.post("http://users:5000/user", params={'username': req_username, 'password': req_password})
+    response = requests.post("http://users:5000/user", json={'username': req_username, 'password': req_password})
     user_exists = response.json()['success']
     success = response.status_code == 200 and user_exists
 

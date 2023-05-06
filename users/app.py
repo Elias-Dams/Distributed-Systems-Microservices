@@ -39,10 +39,12 @@ def user_exists(username, password):
 
 class UserExists(Resource):
     def post(self):
-        args = flask_request.args
-        if 'username' not in args or 'password' not in args:
+        request_data = flask_request.json
+        username = request_data.get('username')
+        password = request_data.get('password')
+        if not username or not password:
             return {'message': 'Invalid request. Please provide both username and password.', 'success': False}, 400
-        exists = user_exists(args['username'], args['password'])
+        exists = user_exists(username, password)
         return {'success': exists}, 200
 
 class AddUser(Resource):
