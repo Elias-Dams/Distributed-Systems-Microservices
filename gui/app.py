@@ -126,9 +126,12 @@ def friends():
     # ================================
 
     if username is not None:
+        response = requests.get("http://users:5000/user/friends", params={'user': username})
         friend_list = []
+        if response.status_code == 200 and response.json()['success']:
+            friend_list = response.json()['result']
     else:
-        friend_list = []  # TODO: call
+        friend_list = []
 
     return render_template('friends.html', username=username, password=password, success=success, friend_list=friend_list)
 
@@ -146,7 +149,9 @@ def add_friend():
     global username
     req_username = request.form['username']
 
-    success = None  # TODO: call
+    response = requests.put("http://users:5000/user/add_friend", params={'user_1': username, 'user_2': req_username})
+    friend_added = response.json()['success']
+    success = response.status_code == 200 and friend_added
     save_to_session('success', success)
 
     return redirect('/friends')

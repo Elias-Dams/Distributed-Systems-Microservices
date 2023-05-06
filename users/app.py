@@ -36,6 +36,55 @@ def user_exists(username, password):
     cur.execute("SELECT COUNT(*) FROM users WHERE username = %s AND password = %s;", (username, hashed_password))
     return bool(cur.fetchone()[0]) # Either True or False
 
+def add_friend(username_1, username_2):
+    cur = conn.cursor()
+
+    # Get the user IDs of the given usernames
+    cur.execute('SELECT id FROM users WHERE username = %s OR username = %s', (username_1, username_2))
+    user_ids = cur.fetchall()
+
+    if len(user_ids) < 2:
+        return False
+
+    # Make sure user_id_1 is smaller than user_id_2
+    user_id_1, user_id_2 = sorted(user_ids)
+
+    cur.execute('SELECT 1 FROM friends WHERE user_id_1 = %s AND user_id_2 = %s', (user_id_1, user_id_2))
+    exists = cur.fetchone() is not None
+
+    if not exists:
+        cur.execute('INSERT INTO friends (user_id_1, user_id_2) VALUES (%s, %s)', (user_id_1, user_id_2))
+        conn.commit()
+        return True
+    return False
+
+def get_friends(username):
+    cur = conn.cursor()
+
+    # Get the user ID corresponding to the given username
+    cur.execute('SELECT id FROM users WHERE username = %s', (username,))
+    user_id = cur.fetchone()
+
+    if user_id is None:
+        return False, []
+
+    # Get the IDs of all friends of the user
+    cur.execute('''
+        SELECT user_id_2 FROM friends
+        WHERE user_id_1 = %s
+        UNION
+        SELECT user_id_1 FROM friends
+        WHERE user_id_2 = %s
+    ''', (user_id[0], user_id[0]))
+    friend_ids = [row[0] for row in cur.fetchall()]
+    if len(friend_ids) == 0:
+        return True, []
+
+    # Get the usernames of all friends
+    cur.execute('SELECT username FROM users WHERE id IN %s', (tuple(friend_ids),))
+    friends = [row[0] for row in cur.fetchall()]
+
+    return True, friends
 
 class UserExists(Resource):
     def post(self):
@@ -56,11 +105,18 @@ class AddUser(Resource):
 
 class FriendsOfUser(Resource):
     def get(self):
-        pass
+        args = flask_request.args
+        if 'user' not in args:
+            return {'message': 'Invalid request. Please provide a user.', 'success': False}, 400
+        status, friends = get_friends(args['user'])
+        return {'success': status, 'result': friends}, 200
 
 class AddFriends(Resource):
     def put(self):
-        pass
+        args = flask_request.args
+        if 'user_1' not in args or 'user_2' not in args:
+            return {'message': 'Invalid request. Please provide 2 users.', 'success': False}, 400
+        return {'success': add_friend(args['user_1'], args['user_2'])}, 200
 
 api.add_resource(UserExists, '/user/')
 api.add_resource(AddUser, '/user/add')
