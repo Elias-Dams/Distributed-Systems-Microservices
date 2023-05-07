@@ -9,8 +9,15 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "playlists" <<-EOSQ
     CREATE TABLE playlists (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
+        user_id INTEGER NOT NULL
+    );
+EOSQL
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "playlists" <<-EOSQL
+    CREATE TABLE shared (
+        playlist_id INTEGER REFERENCES playlists(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL,
-        shared BOOLEAN DEFAULT FALSE
+        PRIMARY KEY (playlist_id, user_id)
     );
 EOSQL
 

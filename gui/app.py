@@ -170,7 +170,7 @@ def playlists():
         #
         # Get all playlists you created and all playlist that are shared with you. (list of id, title pairs)
         # ================================
-        response = requests.get("http://playlists:5000/playlists", params={'username': username})
+        response = requests.get("http://playlists:5000/playlists", params={'username': username, 'shared': False})
         status = response.json()['success']
         if response.status_code == 200 and status:
             my_playlists = response.json()['result']
@@ -205,7 +205,13 @@ def a_playlist(playlist_id):
     #
     # List all songs within a playlist
     # ================================
-    songs = [] # TODO: call
+    songs = []
+
+    response = requests.get("http://playlists:5000/playlists/songs", params={'playlist_id': playlist_id})
+    status = response.json()['success']
+    if response.status_code == 200 and status:
+        songs = response.json()['result']
+
     return render_template('a_playlist.html', username=username, password=password, songs=songs, playlist_id=playlist_id)
 
 
@@ -218,7 +224,9 @@ def add_song_to_playlist(playlist_id):
     # ================================
     title, artist = request.form['title'], request.form['artist']
 
-    # TODO: call
+    requests.post("http://playlists:5000/playlists/add_song",
+                 json={'title': title, 'artist': artist, 'playlist_id': playlist_id})
+
     return redirect(f'/playlists/{playlist_id}')
 
 
@@ -231,7 +239,9 @@ def invite_user_to_playlist(playlist_id):
     # ================================
     recipient = request.form['user']
 
-    # TODO: call
+    requests.post("http://playlists:5000/playlists/share",
+                  json={'user': recipient, 'playlist_id': playlist_id})
+
     return redirect(f'/playlists/{playlist_id}')
 
 

@@ -44,7 +44,7 @@ def add_playlist(username, playlist_name):
     # Return the ID of the new playlist
     return True, playlist_id
 
-def get_playlists(username, shared=None):
+def get_playlists(username, shared):
     cur = conn.cursor()
 
     # Get the user's ID
@@ -52,22 +52,56 @@ def get_playlists(username, shared=None):
     if not user_id:
         return False, None
 
-    if shared is None:
+    if not bool(shared.lower() == 'true'):
         cur.execute('SELECT id, name FROM playlists WHERE user_id = %s', (user_id,))
-    elif shared:
-        cur.execute('SELECT id, name FROM playlists WHERE user_id = %s AND shared = TRUE', (user_id,))
     else:
-        cur.execute('SELECT id, name FROM playlists WHERE user_id = %s AND shared = FALSE', (user_id,))
+        cur.execute('SELECT playlists.id, playlists.name FROM playlists LEFT JOIN shared ON playlists.id = shared.playlist_id WHERE shared.user_id = %s', (user_id,))
 
     return True, cur.fetchall()
+
+def add_song_to_playlist(title, artist, playlist_id):
+    cur = conn.cursor()
+
+    # check if song exits
+    response = requests.get("http://songs:5000/songs/exist", params={'title': title, 'artist':artist})
+    if not response.json():
+        return False
+
+    cur.execute("INSERT INTO playlist_songs (playlist_id, artist, title) VALUES (%s, %s, %s);",
+                (int(playlist_id), artist, title))
+    conn.commit()
+    return True
+
+def get_playlist_songs(playlist_id):
+    cur = conn.cursor()
+    cur.execute("SELECT title, artist FROM playlist_songs WHERE playlist_id = %s", (int(playlist_id),))
+    songs = cur.fetchall()
+    if len(songs) == 0:
+        return False, []
+    return True, songs
+
+def share_playlist(user, playlist_id):
+    cur = conn.cursor()
+
+    # Get the user's ID
+    user_id = get_user_id(user)
+    if not user_id:
+        return False
+
+    # Add the playlist to the database
+    cur.execute("INSERT INTO shared (playlist_id, user_id) VALUES (%s, %s);", (int(playlist_id), int(user_id)))
+
+    # Commit the transaction and close the connection
+    conn.commit()
+
+    return True
 
 class GetPlaylists(Resource):
     def get(self):
         args = flask_request.args
         if "shared" not in args:
-            status, playlists = get_playlists(args['username'])
-        else:
-            status, playlists = get_playlists(args['username'], args['shared'])
+            return {'message': 'Invalid request. Please provide shared.', 'success': False}, 400
+        status, playlists = get_playlists(args['username'], args['shared'])
         return {'success': status, 'result': playlists}, 200
 
 class AddPlaylist(Resource):
@@ -82,15 +116,32 @@ class AddPlaylist(Resource):
 
 class GetPlaylistSongs(Resource):
     def get(self):
-        pass
+        args = flask_request.args
+        if "playlist_id" not in args:
+            return {'message': 'Invalid request. Please provide a playlist id.', 'success': False}, 400
+        status, songs = get_playlist_songs(args['playlist_id'])
+        return {'success': status, 'result': songs}, 200
 
 class AddPlaylistSong(Resource):
     def post(self):
-        pass
+        request_data = flask_request.json
+        title = request_data.get('title')
+        artist = request_data.get('artist')
+        playlist_id = request_data.get('playlist_id')
+        if not artist or not title or not playlist_id:
+            return {'message': 'Invalid request. Please provide both artist, title and playlist_id.', 'success': False}, 400
+        return {'success': add_song_to_playlist(title, artist, playlist_id)}, 200
+
 
 class SharePlaylist(Resource):
     def post(self):
-        pass
+        request_data = flask_request.json
+        user = request_data.get('user')
+        playlist_id = request_data.get('playlist_id')
+        if not user or not playlist_id:
+            return {'message': 'Invalid request. Please provide both user and playlist_id.',
+                    'success': False}, 400
+        return {'success': share_playlist(user, playlist_id)}, 200
 
 api.add_resource(GetPlaylists, '/playlists/')
 api.add_resource(AddPlaylist, '/playlists/create')
