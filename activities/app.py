@@ -4,6 +4,7 @@ from flask_restful import Resource, Api, reqparse
 import requests
 import psycopg2
 import datetime
+import pytz
 
 app = Flask("activities")
 api = Api(app)
@@ -60,11 +61,13 @@ def get_activities(username, num_entries):
 
     result = []
     username_cache = {}
+    timezone_local = pytz.timezone('Europe/Amsterdam')
     for row in cur.fetchall():
         user_id = row[1]
         if user_id not in username_cache:
             username_cache[user_id] = get_username(user_id)
-        result.append((row[0].strftime('%a %d %b (%Y) %H:%M'), username_cache[user_id], row[2]))
+        timestamp_local = row[0].astimezone(timezone_local)
+        result.append((timestamp_local.strftime('%a %d %b (%Y) %H:%M'), username_cache[user_id], row[2]))
 
     return True, result
 
