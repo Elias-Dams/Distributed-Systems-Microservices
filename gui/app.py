@@ -32,7 +32,10 @@ def feed():
     N = 10
 
     if username is not None:
-        feed = []  # TODO: call
+        response = requests.get("http://activities:5000/activities", params={'username': username, 'amount': N})
+        feed = [["oei", "oei", "oei"]]
+        if response.status_code == 200 and response.json()['success']:
+            feed = response.json()['result']
     else:
         feed = []
 
@@ -222,10 +225,12 @@ def add_song_to_playlist(playlist_id):
     #
     # Add a song (represented by a title & artist) to a playlist (represented by an id)
     # ================================
+    global username
+
     title, artist = request.form['title'], request.form['artist']
 
     requests.post("http://playlists:5000/playlists/add_song",
-                 json={'title': title, 'artist': artist, 'playlist_id': playlist_id})
+                 json={'title': title, 'artist': artist, 'playlist_id': playlist_id, "user": username})
 
     return redirect(f'/playlists/{playlist_id}')
 
@@ -237,10 +242,12 @@ def invite_user_to_playlist(playlist_id):
     #
     # Share a playlist (represented by an id) with a user.
     # ================================
+    global username
+
     recipient = request.form['user']
 
     requests.post("http://playlists:5000/playlists/share",
-                  json={'user': recipient, 'playlist_id': playlist_id})
+                  json={'user': username, 'recipient': recipient, 'playlist_id': playlist_id})
 
     return redirect(f'/playlists/{playlist_id}')
 

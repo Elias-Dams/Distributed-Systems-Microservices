@@ -21,11 +21,14 @@ while conn is None:
 
 def get_user_id(username):
     response = requests.get("http://users:5000/user/data", params={'username': username})
-    status = response.json()['success']
-    if response.status_code == 200 and status:
+    if response.status_code == 200 and response.json()['success']:
         return response.json()['result']['id']
     else:
         return None
+
+def add_activity(username, activity):
+    requests.post("http://activities:5000/activities/add", json={'username': username, 'activity': activity})
+
 def add_playlist(username, playlist_name):
     cur = conn.cursor()
 
@@ -40,6 +43,9 @@ def add_playlist(username, playlist_name):
 
     # Commit the transaction and close the connection
     conn.commit()
+
+    # add the activity
+    add_activity(username, "created a playlist")
 
     # Return the ID of the new playlist
     return True, playlist_id
@@ -59,7 +65,7 @@ def get_playlists(username, shared):
 
     return True, cur.fetchall()
 
-def add_song_to_playlist(title, artist, playlist_id):
+def add_song_to_playlist(title, artist, playlist_id, username):
     cur = conn.cursor()
 
     # check if song exits
@@ -70,6 +76,10 @@ def add_song_to_playlist(title, artist, playlist_id):
     cur.execute("INSERT INTO playlist_songs (playlist_id, artist, title) VALUES (%s, %s, %s);",
                 (int(playlist_id), artist, title))
     conn.commit()
+
+    # add the activity
+    add_activity(username, f"Added a song to a playlist")
+
     return True
 
 def get_playlist_songs(playlist_id):
@@ -80,11 +90,11 @@ def get_playlist_songs(playlist_id):
         return False, []
     return True, songs
 
-def share_playlist(user, playlist_id):
+def share_playlist(username, recipient, playlist_id):
     cur = conn.cursor()
 
     # Get the user's ID
-    user_id = get_user_id(user)
+    user_id = get_user_id(recipient)
     if not user_id:
         return False
 
@@ -93,6 +103,9 @@ def share_playlist(user, playlist_id):
 
     # Commit the transaction and close the connection
     conn.commit()
+
+    # add the activity
+    add_activity(username, f"Shared a playlist with a friend")
 
     return True
 
@@ -128,20 +141,22 @@ class AddPlaylistSong(Resource):
         title = request_data.get('title')
         artist = request_data.get('artist')
         playlist_id = request_data.get('playlist_id')
-        if not artist or not title or not playlist_id:
-            return {'message': 'Invalid request. Please provide both artist, title and playlist_id.', 'success': False}, 400
-        return {'success': add_song_to_playlist(title, artist, playlist_id)}, 200
+        user = request_data.get('user')
+        if not artist or not title or not playlist_id or not user:
+            return {'message': 'Invalid request. Please provide an artist, title, playlist_id and user.', 'success': False}, 400
+        return {'success': add_song_to_playlist(title, artist, playlist_id, user)}, 200
 
 
 class SharePlaylist(Resource):
     def post(self):
         request_data = flask_request.json
         user = request_data.get('user')
+        recipient = request_data.get('recipient')
         playlist_id = request_data.get('playlist_id')
-        if not user or not playlist_id:
-            return {'message': 'Invalid request. Please provide both user and playlist_id.',
+        if not user or not recipient or not playlist_id:
+            return {'message': 'Invalid request. Please provide the user, recipient and playlist_id.',
                     'success': False}, 400
-        return {'success': share_playlist(user, playlist_id)}, 200
+        return {'success': share_playlist(user, recipient , playlist_id)}, 200
 
 api.add_resource(GetPlaylists, '/playlists/')
 api.add_resource(AddPlaylist, '/playlists/create')

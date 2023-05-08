@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request as flask_request
 from flask_restful import Resource, Api, reqparse
+import requests
 import psycopg2
 import hashlib
 
@@ -18,6 +19,9 @@ while conn is None:
         import time
         time.sleep(1)
         print("Retrying DB connection")
+
+def add_activity(username, activity):
+    requests.post("http://activities:5000/activities/add", json={'username': username, 'activity': activity})
 
 def add_user(username, password):
     if not user_exists(username, password):
@@ -55,10 +59,13 @@ def add_friend(username_1, username_2):
     if not exists:
         cur.execute('INSERT INTO friends (user_id_1, user_id_2) VALUES (%s, %s)', (user_id_1, user_id_2))
         conn.commit()
+
+        # add the activity
+        add_activity(username_1, f"Made a friend")
         return True
     return False
 
-def get_friends(username):
+def get_friends(username, by_id=None):
     cur = conn.cursor()
 
     # Get the user ID corresponding to the given username
@@ -80,16 +87,25 @@ def get_friends(username):
     if len(friend_ids) == 0:
         return True, []
 
+    if by_id and bool(by_id.lower() == 'true'):
+        return True, friend_ids
+
     # Get the usernames of all friends
     cur.execute('SELECT username FROM users WHERE id IN %s', (tuple(friend_ids),))
     friends = [row[0] for row in cur.fetchall()]
 
     return True, friends
 
-def get_userdata(username):
+def get_userdata(username=None, user_id=None):
     cur = conn.cursor()
-    cur.execute("SELECT id, username, password FROM users WHERE username = %s;", (username,))
-    result = cur.fetchone()
+    if username:
+        cur.execute("SELECT id, username, password FROM users WHERE username = %s;", (username,))
+        result = cur.fetchone()
+    elif user_id:
+        cur.execute("SELECT id, username, password FROM users WHERE id = %s;", (user_id,))
+        result = cur.fetchone()
+    else:
+        return False, None
     if result:
         return True, {'id': result[0], 'username': result[1], 'password': result[2]}
     return False, None
@@ -107,10 +123,13 @@ class UserExists(Resource):
 class GetUserdata(Resource):
     def get(self):
         args = flask_request.args
-        if 'username' not in args:
-            return {'message': 'Invalid request. Please provide the username.', 'success': False}, 400
-        status, user_date = get_userdata(args['username'])
-        return {'success': status, 'result': user_date}, 200
+        if 'username' not in args and 'user_id' not in args:
+            return {'message': 'Invalid request. Please provide the username or user_id.', 'success': False}, 400
+        if 'user_id' in args:
+            status, user_data = get_userdata(user_id=args['user_id'])
+        else:
+            status, user_data = get_userdata(username=args['username'])
+        return {'success': status, 'result': user_data}, 200
 
 class AddUser(Resource):
     def put(self):
@@ -124,7 +143,10 @@ class FriendsOfUser(Resource):
         args = flask_request.args
         if 'user' not in args:
             return {'message': 'Invalid request. Please provide a user.', 'success': False}, 400
-        status, friends = get_friends(args['user'])
+        if 'by_id' in args:
+            status, friends = get_friends(args['user'], args['by_id'])
+        else:
+            status, friends = get_friends(args['user'])
         return {'success': status, 'result': friends}, 200
 
 class AddFriends(Resource):
