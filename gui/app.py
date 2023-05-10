@@ -8,6 +8,8 @@ app = Flask(__name__)
 username = None
 password = None
 
+RETRIES = 3  # Number of times to retry the request
+
 session_data = dict()
 
 
@@ -27,15 +29,21 @@ def feed():
     # Get the feed of the last N activities of your friends.
     # ================================
 
-    global username
+    global username, RETRIES
 
     N = 10
 
     if username is not None:
-        response = requests.get("http://activities:5000/activities", params={'username': username, 'amount': N})
         feed = []
-        if response.status_code == 200 and response.json()['success']:
-            feed = response.json()['result']
+        for i in range(RETRIES):
+            try:
+                response = requests.get("http://activities:5000/activities", params={'username': username, 'amount': N})
+                if response.status_code == 200 and response.json()['success']:
+                    feed = response.json()['result']
+                break
+            except requests.exceptions.RequestException:
+                print(f"connection to activities service failed.")
+                continue
     else:
         feed = []
 
@@ -44,7 +52,17 @@ def feed():
 
 @app.route("/catalogue")
 def catalogue():
-    songs = requests.get("http://songs:5000/songs").json()
+    global RETRIES
+
+    songs = []
+
+    for i in range(RETRIES):
+        try:
+            songs = requests.get("http://songs:5000/songs").json()
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to songs service failed.")
+            continue
 
     return render_template('catalogue.html', username=username, password=password, songs=songs)
 
@@ -68,9 +86,19 @@ def actual_login():
     # Also pay attention to the status code returned by the microservice.
     # ================================
 
-    response = requests.post("http://users:5000/user", json={'username': req_username, 'password': req_password})
-    user_exists = response.json()['success']
-    success = response.status_code == 200 and user_exists
+    global RETRIES
+
+    success = False
+    for i in range(RETRIES):
+        try:
+            response = requests.post("http://users:5000/user",
+                                     json={'username': req_username, 'password': req_password})
+            user_exists = response.json()['success']
+            success = response.status_code == 200 and user_exists
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to users service failed.")
+            continue
 
     save_to_session('success', success)
     if success:
@@ -102,9 +130,20 @@ def actual_register():
     # Registration is successful if a user with the same username doesn't exist yet.
     # ================================
 
-    response = requests.put("http://users:5000/user/add", params={'username': req_username, 'password': req_password})
-    user_exists = response.json()['success']
-    success = response.status_code == 200 and user_exists
+    global RETRIES
+
+    success = False
+    for i in range(RETRIES):
+        try:
+            response = requests.put("http://users:5000/user/add",
+                                    params={'username': req_username, 'password': req_password})
+            user_exists = response.json()['success']
+            success = response.status_code == 200 and user_exists
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to users service failed.")
+            continue
+
     save_to_session('success', success)
 
     if success:
@@ -120,7 +159,7 @@ def actual_register():
 def friends():
     success = load_from_session('success')
 
-    global username
+    global username, RETRIES
 
     # ================================
     # FEATURE 4
@@ -129,10 +168,16 @@ def friends():
     # ================================
 
     if username is not None:
-        response = requests.get("http://users:5000/user/friends", params={'user': username})
         friend_list = []
-        if response.status_code == 200 and response.json()['success']:
-            friend_list = response.json()['result']
+        for i in range(RETRIES):
+            try:
+                response = requests.get("http://users:5000/user/friends", params={'user': username})
+                if response.status_code == 200 and response.json()['success']:
+                    friend_list = response.json()['result']
+                break
+            except requests.exceptions.RequestException:
+                print(f"connection to users service failed.")
+                continue
     else:
         friend_list = []
 
@@ -149,12 +194,21 @@ def add_friend():
     # microservice returns True if the friend request is successful (the friend exists & is not already friends), False if otherwise
     # ==============================
 
-    global username
+    global username, RETRIES
     req_username = request.form['username']
 
-    response = requests.put("http://users:5000/user/add_friend", params={'user_1': username, 'user_2': req_username})
-    friend_added = response.json()['success']
-    success = response.status_code == 200 and friend_added
+    success = False
+    for i in range(RETRIES):
+        try:
+            response = requests.put("http://users:5000/user/add_friend",
+                                    params={'user_1': username, 'user_2': req_username})
+            friend_added = response.json()['success']
+            success = response.status_code == 200 and friend_added
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to users service failed.")
+            continue
+
     save_to_session('success', success)
 
     return redirect('/friends')
@@ -162,7 +216,7 @@ def add_friend():
 
 @app.route('/playlists')
 def playlists():
-    global username
+    global username, RETRIES
 
     my_playlists = []
     shared_with_me = []
@@ -173,15 +227,26 @@ def playlists():
         #
         # Get all playlists you created and all playlist that are shared with you. (list of id, title pairs)
         # ================================
-        response = requests.get("http://playlists:5000/playlists", params={'username': username, 'shared': False})
-        status = response.json()['success']
-        if response.status_code == 200 and status:
-            my_playlists = response.json()['result']
+        my_playlists = []
+        shared_with_me = []
 
-        response = requests.get("http://playlists:5000/playlists", params={'username': username, 'shared': True})
-        status = response.json()['success']
-        if response.status_code == 200 and status:
-            shared_with_me = response.json()['result']
+        for i in range(RETRIES):
+            try:
+                response = requests.get("http://playlists:5000/playlists",
+                                        params={'username': username, 'shared': False})
+                status = response.json()['success']
+                if response.status_code == 200 and status:
+                    my_playlists = response.json()['result']
+
+                response = requests.get("http://playlists:5000/playlists",
+                                        params={'username': username, 'shared': True})
+                status = response.json()['success']
+                if response.status_code == 200 and status:
+                    shared_with_me = response.json()['result']
+                break
+            except requests.exceptions.RequestException:
+                print(f"connection to playlists service failed.")
+                continue
 
     return render_template('playlists.html', username=username, password=password, my_playlists=my_playlists, shared_with_me=shared_with_me)
 
@@ -193,10 +258,16 @@ def create_playlist():
     #
     # Create a playlist by sending the owner and the title to the microservice.
     # ================================
-    global username
+    global username, RETRIES
     title = request.form['title']
 
-    requests.post("http://playlists:5000/playlists/create", json={'username': username, 'title': title})
+    for i in range(RETRIES):
+        try:
+            requests.post("http://playlists:5000/playlists/create", json={'username': username, 'title': title})
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to playlists service failed.")
+            continue
 
     return redirect('/playlists')
 
@@ -208,12 +279,21 @@ def a_playlist(playlist_id):
     #
     # List all songs within a playlist
     # ================================
+    global RETRIES
     songs = []
 
-    response = requests.get("http://playlists:5000/playlists/songs", params={'playlist_id': playlist_id})
-    status = response.json()['success']
-    if response.status_code == 200 and status:
-        songs = response.json()['result']
+    for i in range(RETRIES):
+        try:
+            response = requests.get("http://playlists:5000/playlists/songs", params={'playlist_id': playlist_id})
+            status = response.json()['success']
+            if response.status_code == 200 and status:
+                songs = response.json()['result']
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to playlists service failed.")
+            continue
+
+
 
     return render_template('a_playlist.html', username=username, password=password, songs=songs, playlist_id=playlist_id)
 
@@ -225,12 +305,18 @@ def add_song_to_playlist(playlist_id):
     #
     # Add a song (represented by a title & artist) to a playlist (represented by an id)
     # ================================
-    global username
+    global username, RETRIES
 
     title, artist = request.form['title'], request.form['artist']
 
-    requests.post("http://playlists:5000/playlists/add_song",
-                 json={'title': title, 'artist': artist, 'playlist_id': playlist_id, "user": username})
+    for i in range(RETRIES):
+        try:
+            requests.post("http://playlists:5000/playlists/add_song",
+                          json={'title': title, 'artist': artist, 'playlist_id': playlist_id, "user": username})
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to playlists service failed.")
+            continue
 
     return redirect(f'/playlists/{playlist_id}')
 
@@ -242,12 +328,18 @@ def invite_user_to_playlist(playlist_id):
     #
     # Share a playlist (represented by an id) with a user.
     # ================================
-    global username
+    global username, RETRIES
 
     recipient = request.form['user']
 
-    requests.post("http://playlists:5000/playlists/share",
-                  json={'user': username, 'recipient': recipient, 'playlist_id': playlist_id})
+    for i in range(RETRIES):
+        try:
+            requests.post("http://playlists:5000/playlists/share",
+                          json={'user': username, 'recipient': recipient, 'playlist_id': playlist_id})
+            break
+        except requests.exceptions.RequestException:
+            print(f"connection to playlists service failed.")
+            continue
 
     return redirect(f'/playlists/{playlist_id}')
 
