@@ -33,7 +33,7 @@ def feed():
 
     if username is not None:
         response = requests.get("http://activities:5000/activities", params={'username': username, 'amount': N})
-        feed = [["oei", "oei", "oei"]]
+        feed = []
         if response.status_code == 200 and response.json()['success']:
             feed = response.json()['result']
     else:

@@ -9,6 +9,8 @@ import pytz
 app = Flask("activities")
 api = Api(app)
 
+RETRIES = 3  # Number of times to retry the request
+
 conn = None
 
 while conn is None:
@@ -22,37 +24,63 @@ while conn is None:
 
 
 def get_username(user_id):
-    response = requests.get("http://users:5000/user/data", params={'user_id': user_id})
-
-    if response.status_code == 200 and response.json()['success']:
-        return response.json()['result']['username']
-    else:
-        return None
+    global RETRIES
+    for i in range(RETRIES):
+        try:
+            response = requests.get("http://users:5000/user/data", params={'user_id': user_id})
+            if response.status_code == 200 and response.json()['success']:
+                return response.json()['result']['username']
+            else:
+                return None
+        except requests.exceptions.RequestException:
+            if i == RETRIES - 1:
+                raise Exception(f"service is not reachable")
+            print(f"connection to users service failed.")
+            continue
 
 def get_user_id(username):
-    response = requests.get("http://users:5000/user/data", params={'username': username})
-    if response.status_code == 200 and response.json()['success']:
-        return response.json()['result']['id']
-    else:
-        return None
+    global RETRIES
+    for i in range(RETRIES):
+        try:
+            response = requests.get("http://users:5000/user/data", params={'username': username})
+            if response.status_code == 200 and response.json()['success']:
+                return response.json()['result']['id']
+            else:
+                return None
+        except requests.exceptions.RequestException:
+            if i == RETRIES - 1:
+                raise Exception(f"service is not reachable")
+            print(f"connection to users service failed.")
+            continue
 
 def get_friend_ids(username):
-    response = requests.get("http://users:5000/user/friends", params={'user': username, 'by_id': True})
+    global RETRIES
+    for i in range(RETRIES):
+        try:
+            response = requests.get("http://users:5000/user/friends", params={'user': username, 'by_id': True})
 
-    friend_list = []
-    if response.status_code == 200 and response.json()['success']:
-        friend_list = response.json()['result']
+            friend_list = []
+            if response.status_code == 200 and response.json()['success']:
+                friend_list = response.json()['result']
 
-    return friend_list
+            return friend_list
+        except requests.exceptions.RequestException:
+            if i == RETRIES - 1:
+                raise Exception(f"service is not reachable")
+            print(f"connection to users service failed.")
+            continue
 
 def get_activities(username, num_entries):
     cur = conn.cursor()
 
-    # get the user id's of the friends
-    friend_list = get_friend_ids(username)
-    if len(friend_list) == 0:
-        return True, []
-
+    try:
+        # get the user id's of the friends
+        friend_list = get_friend_ids(username)
+        if len(friend_list) == 0:
+            return True, [], 200
+    except Exception as e:
+        # the service could not be reached
+        return False, [], 503
 
     # Create a string of comma-separated user IDs for the query
     user_ids_str = ','.join(str(uid) for uid in friend_list)
@@ -65,32 +93,40 @@ def get_activities(username, num_entries):
     for row in cur.fetchall():
         user_id = row[1]
         if user_id not in username_cache:
-            username_cache[user_id] = get_username(user_id)
+            try:
+                username_cache[user_id] = get_username(user_id)
+            except Exception as e:
+                # the service could not be reached
+                return False, [], 503
         timestamp_local = row[0].astimezone(timezone_local)
         result.append((timestamp_local.strftime('%a %d %b (%Y) %H:%M'), username_cache[user_id], row[2]))
 
-    return True, result
+    return True, result, 200
 
 def add_activity(username, activity_type):
     cur = conn.cursor()
 
-    user_id = get_user_id(username)
-    if not user_id:
-        return False
+    try:
+        user_id = get_user_id(username)
+        if not user_id:
+            return False, 404
+    except Exception as e:
+        # the service could not be reached
+        return False, [], 503
 
     timestamp = datetime.datetime.now()
     cur.execute("INSERT INTO activities (user_id, activity_type, timestamp) VALUES (%s, %s, %s);",
                 (user_id, activity_type, timestamp))
     conn.commit()
-    return True
+    return True, 200
 
 class GetActivities(Resource):
     def get(self):
         args = flask_request.args
         if 'username' not in args or 'amount' not in args:
             return {'message': 'Invalid request. Please provide the username and the amount of data.', 'success': False}, 400
-        status, activity_data = get_activities(args['username'], args['amount'])
-        return {'success': status, 'result': activity_data}, 200
+        status, activity_data, status_code = get_activities(args['username'], args['amount'])
+        return {'success': status, 'result': activity_data}, status_code
 
 class AddActivities(Resource):
     def post(self):
@@ -99,7 +135,8 @@ class AddActivities(Resource):
         activity = request_data.get('activity')
         if not username or not activity:
             return {'message': 'Invalid request. Please provide both user id and activity.', 'success': False}, 400
-        return {'success': add_activity(username, activity)}, 200
+        status, status_code  = add_activity(username, activity)
+        return {'success': status}, status_code
 
 api.add_resource(GetActivities, '/activities/')
 api.add_resource(AddActivities, '/activities/add')

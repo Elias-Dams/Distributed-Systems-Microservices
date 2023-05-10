@@ -9,6 +9,8 @@ import hashlib
 app = Flask("users")
 api = Api(app)
 
+RETRIES = 3  # Number of times to retry the request
+
 conn = None
 
 while conn is None:
@@ -21,7 +23,16 @@ while conn is None:
         print("Retrying DB connection")
 
 def add_activity(username, activity):
-    requests.post("http://activities:5000/activities/add", json={'username': username, 'activity': activity})
+    global RETRIES
+    for i in range(RETRIES):
+        try:
+            requests.post("http://activities:5000/activities/add", json={'username': username, 'activity': activity})
+            break
+        except requests.exceptions.RequestException:
+            if i == RETRIES - 1:
+                raise Exception(f"service is not reachable")
+            print(f"connection to activities service failed.")
+            continue
 
 def add_user(username, password):
     if not user_exists(username, password):
