@@ -91,8 +91,8 @@ def actual_login():
     success = False
     for i in range(RETRIES):
         try:
-            response = requests.post("http://users:5000/user",
-                                     json={'username': req_username, 'password': req_password})
+            response = requests.get("http://users:5000/user",
+                                     params={'username': req_username, 'password': req_password})
             user_exists = response.json()['success']
             success = response.status_code == 200 and user_exists
             break

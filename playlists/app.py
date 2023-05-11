@@ -70,7 +70,7 @@ def add_playlist(username, playlist_name):
         # Get the user's ID
         user_id = int(get_user_id(username))
         if not user_id:
-            return False, None, 200
+            return False, None, 404
     except Exception as e:
         # the service could not be reached
         return False, [], 503
@@ -99,7 +99,7 @@ def get_playlists(username, shared):
         # Get the user's ID
         user_id = int(get_user_id(username))
         if not user_id:
-            return False, None, 200
+            return False, None, 404
     except Exception as e:
         # the service could not be reached
         return False, [], 503
@@ -117,7 +117,7 @@ def add_song_to_playlist(title, artist, playlist_id, username):
     try:
         # check if song exits
         if not song_exits(title, artist):
-            return False, 200
+            return False, 404
     except Exception as e:
         # the service could not be reached
         return False, 503
@@ -148,7 +148,7 @@ def get_playlist_songs(playlist_id):
     cur.execute("SELECT title, artist FROM playlist_songs WHERE playlist_id = %s", (int(playlist_id),))
     songs = cur.fetchall()
     if len(songs) == 0:
-        return False, [], 200
+        return False, [], 404
     return True, songs, 200
 
 def share_playlist(username, recipient, playlist_id):
@@ -158,7 +158,7 @@ def share_playlist(username, recipient, playlist_id):
         # Get the user's ID
         user_id = get_user_id(recipient)
         if not user_id:
-            return False, 200
+            return False, 404
     except Exception as e:
         # the service could not be reached
         return False, 503

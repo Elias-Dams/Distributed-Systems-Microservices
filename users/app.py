@@ -122,14 +122,12 @@ def get_userdata(username=None, user_id=None):
     return False, None
 
 class UserExists(Resource):
-    def post(self):
-        request_data = flask_request.json
-        username = request_data.get('username')
-        password = request_data.get('password')
-        if not username or not password:
+    def get(self):
+        args = flask_request.args
+        if 'username' not in args and 'password' not in args:
             return {'message': 'Invalid request. Please provide both username and password.', 'success': False}, 400
-        exists = user_exists(username, password)
-        return {'success': exists}, 200
+        exists = user_exists(args['username'], args['password'])
+        return {'success': exists}, 200 if exists else 404
 
 class GetUserdata(Resource):
     def get(self):
@@ -140,7 +138,7 @@ class GetUserdata(Resource):
             status, user_data = get_userdata(user_id=args['user_id'])
         else:
             status, user_data = get_userdata(username=args['username'])
-        return {'success': status, 'result': user_data}, 200
+        return {'success': status, 'result': user_data}, 200 if status else 404
 
 class AddUser(Resource):
     def put(self):
@@ -158,7 +156,7 @@ class FriendsOfUser(Resource):
             status, friends = get_friends(args['user'], args['by_id'])
         else:
             status, friends = get_friends(args['user'])
-        return {'success': status, 'result': friends}, 200
+        return {'success': status, 'result': friends}, 200 if status else 404
 
 class AddFriends(Resource):
     def put(self):
