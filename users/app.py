@@ -141,11 +141,13 @@ class GetUserdata(Resource):
         return {'success': status, 'result': user_data}, 200 if status else 404
 
 class AddUser(Resource):
-    def put(self):
-        args = flask_request.args
-        if 'username' not in args or 'password' not in args:
+    def post(self):
+        request_data = flask_request.json
+        username = request_data.get('username')
+        password = request_data.get('password')
+        if not username or not password:
             return {'message': 'Invalid request. Please provide both username and password.', 'success': False}, 400
-        return {'success': add_user(args['username'], args['password'])}, 200
+        return {'success': add_user(username, password)}, 200
 
 class FriendsOfUser(Resource):
     def get(self):
@@ -159,11 +161,13 @@ class FriendsOfUser(Resource):
         return {'success': status, 'result': friends}, 200 if status else 404
 
 class AddFriends(Resource):
-    def put(self):
-        args = flask_request.args
-        if 'user_1' not in args or 'user_2' not in args:
+    def post(self):
+        request_data = flask_request.json
+        user_1 = request_data.get('user_1')
+        user_2 = request_data.get('user_2')
+        if not user_2 or not user_1:
             return {'message': 'Invalid request. Please provide 2 users.', 'success': False}, 400
-        return {'success': add_friend(args['user_1'], args['user_2'])}, 200
+        return {'success': add_friend(user_1, user_2)}, 200
 
 api.add_resource(UserExists, '/user/')
 api.add_resource(GetUserdata, '/user/data')

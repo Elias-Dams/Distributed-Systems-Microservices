@@ -135,8 +135,8 @@ def actual_register():
     success = False
     for i in range(RETRIES):
         try:
-            response = requests.put("http://users:5000/user/add",
-                                    params={'username': req_username, 'password': req_password})
+            response = requests.post("http://users:5000/user/add",
+                                    json={'username': req_username, 'password': req_password})
             user_exists = response.json()['success']
             success = response.status_code == 200 and user_exists
             break
@@ -200,8 +200,8 @@ def add_friend():
     success = False
     for i in range(RETRIES):
         try:
-            response = requests.put("http://users:5000/user/add_friend",
-                                    params={'user_1': username, 'user_2': req_username})
+            response = requests.post("http://users:5000/user/add_friend",
+                                    json={'user_1': username, 'user_2': req_username})
             friend_added = response.json()['success']
             success = response.status_code == 200 and friend_added
             break
